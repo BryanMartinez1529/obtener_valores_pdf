@@ -59,18 +59,19 @@ def extraer_codigos_retencion(pdf_path):
                 lineas = seccion.strip().split("\n")
 
                 for linea in lineas:
-                    match = re.match(r"^(\d{3}[A-Z]?)\s+.*?(\d+(?:,\d{3})*(?:\.\d+)?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)$", linea.strip())
+                    match = re.search(r"^(\d{3,4}[A-Z]?)\s+.*?\s+(\d[\d.,]*)\s+(\d[\d.,]*)$", linea)
                     if match:
                         codigo = match.group(1)
                         base = float(match.group(2).replace(",", ""))
                         codigos_retencion[codigo] = base
+                        
 
     return codigos_retencion
 
 # Función para extraer totales de compras
 def extraer_totales_compras(pdf_path):
-    totales = {}
 
+    totales = []
     with pdfplumber.open(pdf_path) as pdf:
         for pagina in pdf.pages:
             texto = pagina.extract_text()
@@ -82,21 +83,28 @@ def extraer_totales_compras(pdf_path):
                     if "TOTAL:" in linea:
                         numeros = re.findall(r"(\d{1,3}(?:,\d{3})*(?:\.\d+)|\d+\.\d+)", linea)
                         if len(numeros) >= 4:
-                            totales = {
-                                "BI tarifa 0%": float(numeros[0].replace(",", "")),
-                                "BI tarifa diferente 0%": float(numeros[1].replace(",", "")),
-                                "BI No Objeto IVA": float(numeros[2].replace(",", ""))
-                            }
+                            # Total de compras
+                            totales_0 = float(numeros[0].replace(",", ""))
+                            totales_12 = float(numeros[1].replace(",", ""))
+                            # Total de IVA
+                            totales_no_iva = float(numeros[2].replace(",", ""))
+                            totales = [totales_0, totales_12, totales_no_iva]
                         break
     return totales
 
 # Función para convertir el número de mes a la letra de columna correspondiente
-def mes_a_columna(mes):
+def mes_a_columna_formulario(mes):
     columnas = ["C", "F", "I", "L", "O", "R", "U", "X", "AA", "AD", "AG", "AJ"]
     return columnas[mes - 1]
-# Función para escribir datos en una hoja específica de la plantilla Excel (para filas por mes y columnas por índice)
+
+def mes_a_columna_ats(mes):
+    columnas = ["B", "E", "H","K", "N", "Q", "T", "W", "Z", "AC", "AF","AI"]
+    return columnas[mes - 1]
+
+
+
 # Función para escribir datos en una hoja específica de la plantilla Excel
-def escribir_en_hoja(datos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja):
+def escribir_en_hoja(datos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, funcion_mes_a_columna):
     try:
         # Verificar si el archivo de salida ya existe
         if os.path.exists(ruta_salida):
@@ -118,7 +126,7 @@ def escribir_en_hoja(datos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombr
             if indice in ubicaciones:
                 celda_base = ubicaciones[indice][1]
                 fila_base = int(celda_base[1:])  # Extraer el número de fila base (ej. 10)
-                columna_mes = mes_a_columna(mes)  # Obtener la columna correspondiente al mes
+                columna_mes = funcion_mes_a_columna(mes)  # Usar la función pasada como argumento
 
                 celda_destino = f"{columna_mes}{fila_base}"  # Construir la celda destino
                 hoja.range(celda_destino).value = valor  # Insertar el valor
@@ -131,13 +139,13 @@ def escribir_en_hoja(datos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombr
         logging.error(f"Error al escribir en la hoja '{nombre_hoja}' de la plantilla Excel: {e}")
 
 # Procesar múltiples conjuntos de datos
-def procesar_datos_por_hoja(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, indices_a_buscar):
+def procesar_datos_por_hoja(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, indices_a_buscar, funcion_mes_a_columna):
     for mes in range(1, 13):
         ruta_pdf = os.path.join(ruta_pdf_base, f"{mes}.pdf")
 
         if os.path.exists(ruta_pdf):
             valores_extraidos = extraer_valores_indices(ruta_pdf, indices_a_buscar)
-            escribir_en_hoja(valores_extraidos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja)
+            escribir_en_hoja(valores_extraidos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, funcion_mes_a_columna)
         else:
             logging.warning(f"No se encontró el archivo: {ruta_pdf}")
 
@@ -213,6 +221,8 @@ def escribir_en_hoja_por_ubicaciones(datos, mes, ruta_plantilla, ruta_salida, ub
         logging.error(f"Error al escribir en la hoja '{nombre_hoja}' de la plantilla Excel: {e}")
 
 
+
+
 # Procesar datos para la hoja "A4"
 def procesar_datos_por_ubicaciones(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, indices_a_buscar):
     for mes in range(1, 13):
@@ -236,19 +246,62 @@ def procesar_datos_por_filas(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicaci
         else:
             logging.warning(f"No se encontró el archivo: {ruta_pdf}")
 
+def procesar_datos_por_filas_ats(ruta_pdf_base, ruta_plantilla, ruta_salida, nombre_hoja, extractor_func, fila_inicial=11):
+
+    try:
+        for mes in range(1, 13):
+            ruta_pdf = os.path.join(ruta_pdf_base, f"{mes}.pdf")
+
+            if os.path.exists(ruta_pdf):
+                # Extraer los datos del PDF usando la función proporcionada
+                datos_extraidos = extractor_func(ruta_pdf)
+
+                # Abrir el archivo de Excel
+                if os.path.exists(ruta_salida):
+                    app = xw.App(visible=False)
+                    wb = xw.Book(ruta_salida)
+                else:
+                    app = xw.App(visible=False)
+                    wb = xw.Book(ruta_plantilla)
+
+                # Verificar si la hoja existe, si no, crearla
+                if nombre_hoja in [sheet.name for sheet in wb.sheets]:
+                    hoja = wb.sheets[nombre_hoja]
+                else:
+                    hoja = wb.sheets.add(name=nombre_hoja)
+
+                # Calcular la fila correspondiente al mes
+                fila_mes = fila_inicial + (mes - 1)
+
+                # Escribir los datos en las columnas B, C y D
+                columnas = ["B", "C", "D"]
+                for i, valor in enumerate(datos_extraidos):
+                    if i < len(columnas):  # Asegurarse de no exceder el número de columnas
+                        celda_destino = f"{columnas[i]}{fila_mes}"
+                        hoja.range(celda_destino).value = valor
+
+                wb.save(ruta_salida)
+                wb.close()
+                app.quit()
+                logging.info(f"Datos del mes {mes} guardados en la hoja '{nombre_hoja}' en '{ruta_salida}' correctamente.")
+            else:
+                logging.warning(f"No se encontró el archivo: {ruta_pdf}")
+    except Exception as e:
+        logging.error(f"Error al procesar los datos por filas ATS: {e}")
+
 # Procesar datos de tablas
-def procesar_datos_tablas(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, extractor_func):
+def procesar_datos_tablas(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja, extractor_func, mes_a_columna_func):
     for mes in range(1, 13):
         ruta_pdf = os.path.join(ruta_pdf_base, f"{mes}.pdf")
 
         if os.path.exists(ruta_pdf):
             datos_extraidos = extractor_func(ruta_pdf)
-            escribir_en_hoja(datos_extraidos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja)
+            escribir_en_hoja(datos_extraidos, mes, ruta_plantilla, ruta_salida, ubicaciones, nombre_hoja,mes_a_columna_func)
         else:
             logging.warning(f"No se encontró el archivo: {ruta_pdf}")
 
 
-ruta_plantilla = "./pdf/plantilla.xlsx"
+ruta_plantilla = "./pdf/plantilla_1.xlsx"
 ruta_excel_salida = "datos_anuales.xlsx"
 
 # Ubicaciones para el primer conjunto de datos
@@ -288,7 +341,7 @@ ubicaciones_celdas_hoja1 = {
     "421": ("103 VS ATS", "C41")
 }
 
-ubicaciones_celdas_hoja_ats = {
+ubicaciones_celdas_hoja_ats_103 = {
     "302": ("103 VS ATS", "B44"),
     "303": ("103 VS ATS", "B10"),
     "303A": ("103 VS ATS", "B11"),
@@ -341,6 +394,13 @@ ubicaciones_celdas_hoja2 = {
     "535": ("103 VS 104", "Q11"),
 }
 
+ubicaciones_celdas_hoja_ats = {
+    "500": ("104 VS ATS", "B11"),
+    "501": ("104 VS ATS", "C11"),
+    "502": ("104 VS ATS", "D11")
+}
+
+
 # Ubicaciones para el tercer conjunto de datos
 ubicaciones_celdas_hoja3 = {
     "510": ("104 VS ATS", "F11"),
@@ -366,23 +426,33 @@ ubicaciones_celdas_hoja4 = {
 
 
 
-
-# procesar_datos_tablas(
-#     "./pdf/ats",
-#     ruta_plantilla,
-#     ruta_excel_salida,
-#     ubicaciones_celdas_hoja_ats,
-#     "103 VS ATS",
-#     extraer_codigos_retencion
-# )
-
 procesar_datos_por_hoja(
     "./impuestos/103",
     ruta_plantilla,
     ruta_excel_salida,
     ubicaciones_celdas_hoja1,
     "103 VS ATS",
-    indices_a_buscar_103
+    indices_a_buscar_103,
+    mes_a_columna_formulario
+)
+
+procesar_datos_tablas(
+    "./impuestos/ats",
+    ruta_plantilla,
+    ruta_excel_salida,
+    ubicaciones_celdas_hoja_ats_103,
+    "103 VS ATS",
+    extraer_codigos_retencion,
+    mes_a_columna_ats
+)
+
+
+procesar_datos_por_filas_ats(
+    "./impuestos/ats",
+    ruta_plantilla,
+    ruta_excel_salida,
+    "104 VS ATS",
+    extraer_totales_compras
 )
 
 procesar_datos_por_filas(
