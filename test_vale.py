@@ -302,7 +302,7 @@ def procesar_datos_tablas(ruta_pdf_base, ruta_plantilla, ruta_salida, ubicacione
 
 
 ruta_plantilla = "./pdf/plantilla_1.xlsx"
-ruta_excel_salida = "datos_anuales.xlsx"
+ruta_excel_salida = "./impuestos_generados/ep_unach_impuestos.xlsx"
 
 # Ubicaciones para el primer conjunto de datos
 ubicaciones_celdas_hoja1 = {
@@ -427,7 +427,7 @@ ubicaciones_celdas_hoja4 = {
 
 
 procesar_datos_por_hoja(
-    "./impuestos/103",
+    "./matriz_impuestos/ep_unach/103",
     ruta_plantilla,
     ruta_excel_salida,
     ubicaciones_celdas_hoja1,
@@ -437,7 +437,7 @@ procesar_datos_por_hoja(
 )
 
 procesar_datos_tablas(
-    "./impuestos/ats",
+    "./matriz_impuestos/ep_unach/ats",
     ruta_plantilla,
     ruta_excel_salida,
     ubicaciones_celdas_hoja_ats_103,
@@ -448,7 +448,7 @@ procesar_datos_tablas(
 
 
 procesar_datos_por_filas_ats(
-    "./impuestos/ats",
+    "./matriz_impuestos/ep_unach/ats",
     ruta_plantilla,
     ruta_excel_salida,
     "104 VS ATS",
@@ -456,7 +456,7 @@ procesar_datos_por_filas_ats(
 )
 
 procesar_datos_por_filas(
-    "./impuestos/104",
+    "./matriz_impuestos/ep_unach/104",
     ruta_plantilla,
     ruta_excel_salida,
     ubicaciones_celdas_hoja2,
@@ -465,7 +465,7 @@ procesar_datos_por_filas(
 )
 
 procesar_datos_por_filas(
-    "./impuestos/104",
+    "./matriz_impuestos/ep_unach/104",
     ruta_plantilla,
     ruta_excel_salida,
     ubicaciones_celdas_hoja3,
@@ -475,7 +475,7 @@ procesar_datos_por_filas(
 
 
 procesar_datos_por_ubicaciones(
-    "./impuestos/104",
+    "./matriz_impuestos/ep_unach/104",
     ruta_plantilla,
     ruta_excel_salida,
     ubicaciones_celdas_hoja4,
