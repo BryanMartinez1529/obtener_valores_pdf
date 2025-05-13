@@ -1,7 +1,6 @@
 # Ignorar carpetas específicas
-.gitignore
-/convoctoria_borrador/
-/convoctorias_generadas/
-/impuestos_generados/
-/matriz_impuestos/
-/notificaciones_generadas/
+convocatoria_borrador/
+convocatorias_generadas/
+impuestos_generados/
+matriz_impuestos/
+notificaciones_generadas/
